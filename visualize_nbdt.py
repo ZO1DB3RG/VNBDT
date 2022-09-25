@@ -48,6 +48,9 @@ if __name__ == '__main__':
     """
 
     pth_path = '/home/lzl001/NBDT/neural-backed-decision-trees/checkpoint/ckpt-Imagenet10-ResNet50-lr0.01-SoftTreeSupLoss_induced.pth'
+    #tar_path = '/home/lzl001/VNBDT/checkpoints/male_emo25_71.tar'
+    #tar_path = '/home/lzl001/VNBDT/checkpoints/female_emo33_75.tar'
+    #tar_path = '/home/lzl001/FGVC/DFL-CNN/weight/model_best.pth.tar'
 
     """
     支持pth, pkl, tar三种形式的模型文件
