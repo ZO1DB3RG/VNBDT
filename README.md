@@ -78,7 +78,7 @@
 
 ***
 **效果展示**
-<div align=center><img width="500", height="400" src="https://github.com/ZO1DB3RG/VNBDT/blob/main/img/SAOVNBDT.png"/></div>
+<div align=center><img src="https://github.com/ZO1DB3RG/VNBDT/blob/main/img/SAOVNBDT.png"/></div>
 <div align=center><img width="300" height="300" src="https://github.com/ZO1DB3RG/VNBDT/blob/main/img/emo1.gif"/></div>
 
 ## 注意事项
