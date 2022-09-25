@@ -520,6 +520,11 @@ def forword_tree_no(x, model, wnids, dataset):
     return decisions, leaf_to_prob, node_to_prob, predicted[0].item()
 
 
+#######################以上与NBDT原代码五大差异可以不看################################
+
+
+#######################以下为链路节点热力图生成融合代码################################
+
 def get_all_leaf_cam(x, model, leaf_to_prob, num_cls):
     # 模块化应该修改此处
     # 用一个字典装下所有叶节点的cam图，记得修改model.py中的forward_with_decisions函数使其返回一字典---叶节点：logit值
@@ -697,7 +702,6 @@ def fuse_leaf_cam(decisions, img, type_name,
 
     return image_dict, decisions_path_label, decisions_prob
 
-
 def fuse_leaf_cam_with_simple_w(decisions, img, type_name,
                                 cam_dict, output, wnids, predicted):
     """
@@ -751,7 +755,6 @@ def fuse_leaf_cam_with_simple_w(decisions, img, type_name,
 
     return image_dict, decisions_path_label, decisions_prob
 
-
 def compute_complex_weight(cam_dict:dict, predicted):
     """
     输入：cam字典(概率值，cam)、预测类别
@@ -767,6 +770,7 @@ def compute_complex_weight(cam_dict:dict, predicted):
     #w_dict = 1.0 - ((w_dict - min(w_dict)) / (max(w_dict) - min(w_dict)))
 
     return w_dict
+
 
 def fuse_leaf_cam_with_complex_w(decisions, img, type_name,complex_w,
                                  cam_dict, output, wnids, predicted):
@@ -900,6 +904,9 @@ def generate_all_leaf_cam(img, type_name, cam_dict, dataset, output):
         cv2.imwrite(path_cam_img, cam_image)
         print('cam of cls: {} generated'.format(DATASET_TO_CLASSES[dataset][leaf]))
 
+
+#######################以下为量化测试用的代码################################
+
 def generate_cam_mask(decisions, img, type_name, cam_dict, output):
     H, W, _ = img.shape
     decicion_num = len(decisions)
@@ -959,7 +966,6 @@ def generate_cam_mask_one_sample(img, type_name, cam, output):
         path_cam_img = os.path.join(os.path.join(output, type_name), name)
         cv2.imwrite(path_cam_img, img2remove)
     Colors.cyan("mask of img {} has been generated".format(type_name))
-
 
 def generate_cam_mask_with_simple_w(decisions, img, type_name, cam_dict, output):
     H, W, _ = img.shape
@@ -1064,7 +1070,6 @@ def generate_cam_mask_with_complex_w(decisions, img, type_name, cam_dict,
             #Colors.green(name + ' has been generated')
         Colors.cyan("decision {} of img {} has been generated".format(str(ind), type_name))
 
-
 def generate_cam_mask_no_w(decisions, img, type_name, cam_dict, output):
     H, W, _ = img.shape
     decicion_num = len(decisions)
@@ -1113,9 +1118,42 @@ def generate_cam_mask_no_w(decisions, img, type_name, cam_dict, output):
             #Colors.green(name + ' has been generated')
         Colors.cyan("decision {} of img {} has been generated".format(str(ind), type_name))
 
+###############################################################################
+
+def get_layer(arch, model):
+    if arch == "ResNet50":
+        target_layers = [model.model.layer4[-1]]
+    elif arch == 'DFLCNN':
+        target_layers = [model.model.conv5]
+    elif arch == 'vgg16':
+        target_layers = [model.model.features[-1]]
+    elif arch == 'ResNet18':
+        target_layers = [model.model.layer4[-1]]
+    elif arch == 'wrn28_10_cifar10':
+        target_layers = [model.model.features[-3][-1].body.conv2.conv]
+
+    return target_layers
 
 def generate_html(G, root, arch, dataset, cam_method, path_img, net, wnids, num_cls,
-                  output_dir, html_output, size, name, weight:True):
+                  output_dir, html_output, size, name, weight: True):
+    """
+    :param G: tree structure
+    :param root: root node
+    :param arch: (str) model architecture
+    :param dataset: (str) dataset name
+    :param cam_method: (str) explainable methods of CAM
+    :param path_img: (str) image relative path
+    :param net: (model) pytorch model
+    :param wnids: (list) leaf node id
+    :param num_cls: number of leaves
+    :param output_dir: (str) directory of output explanation CAM
+    :param html_output: (str) directory of output html
+    :param size: (set) output image size your explanation desires
+    :param name: (str) a file identifier
+    :param weight: methods of get inner nodes: (complex & simple & None)
+    :return: get explanation
+    """
+
     path_img2 = os.path.join('..', path_img)
     type_name = os.path.split(path_img)[1].split('.')[0] \
                 + '_' + cam_method + '-' + name
@@ -1159,18 +1197,7 @@ def generate_html(G, root, arch, dataset, cam_method, path_img, net, wnids, num_
 
     # 获取一个包含所有叶节点对应cam图的字典，此处还未resize，再进行融合
     # 模型哪一个layer
-
-    target_layers = None
-    if arch == "ResNet50":
-        target_layers = [model.model.layer4[-1]]
-    elif arch == 'DFLCNN':
-        target_layers = [model.model.conv5]
-    elif arch == 'vgg16':
-        target_layers = [model.model.features[-1]]
-    elif arch == 'ResNet18':
-        target_layers = [model.model.layer4[-1]]
-    elif arch == 'wrn28_10_cifar10':
-        target_layers = [model.model.features[-3][-1].body.conv2.conv]
+    target_layers = get_layer(arch, model)
 
 
     if cam_method == 'efccam':
@@ -1184,7 +1211,7 @@ def generate_html(G, root, arch, dataset, cam_method, path_img, net, wnids, num_
 
     # 生成所有叶节点热力图
     #generate_all_leaf_cam(img2, type_name, cam_dict, dataset, output_dir)
-    complex_w = compute_complex_weight(cam_dict, predicted)
+
 
     #不同添加权重的方法:
     if weight == 'simple':
@@ -1192,6 +1219,7 @@ def generate_html(G, root, arch, dataset, cam_method, path_img, net, wnids, num_
                                                                                        img2, type_name, cam_dict,
                                                                                        output_dir, wnids, predicted)
     elif weight == 'complex':
+        complex_w = compute_complex_weight(cam_dict, predicted)
         image_dict, decisions_path_label, decisions_prob = fuse_leaf_cam_with_complex_w(decisions[0],img2, type_name,
                                                                                         complex_w, cam_dict,
                                                                                        output_dir, wnids, predicted)
@@ -1332,17 +1360,7 @@ def generate_pro_html(G, root, method, path, arch, dataset, cam_method, path_img
     # 获取一个包含所有叶节点对应cam图的字典，此处还未resize，再进行融合
     # 模型哪一个layer
 
-    target_layers = None
-    if arch == "ResNet50":
-        target_layers = [model.model.layer4[-1]]
-    elif arch == 'DFLCNN':
-        target_layers = [model.model.conv5]
-    elif arch == 'vgg16':
-        target_layers = [model.model.features[-1]]
-    elif arch == 'ResNet18':
-        target_layers = [model.model.layer4[-1]]
-    elif arch == 'wrn28_10_cifar10':
-        target_layers = [model.model.features[-3][-1].body.conv2.conv]
+    target_layers = get_layer(arch, model)
 
 
     if cam_method == 'efccam':
@@ -1459,235 +1477,6 @@ def generate_pro_html(G, root, method, path, arch, dataset, cam_method, path_img
         root_y=vis_root_y,
         colormap=vis_colormap)
 
-def generate_html_for_attacked(G, root, arch, dataset, cam_method, path_img, net, wnids, num_cls,
-                                output_dir, html_output, name, ad_tensor,weight:True):
-    path_img2 = os.path.join('..', path_img)
-    type_name =  name+ '_' + weight + '_' + os.path.split(path_img)[1].split('.')[0] \
-                + '_' + dataset + '_' + arch + '_' + cam_method
-    img_name = os.path.split(path_img)[1].split('.')[0]
-
-    # 图像读取和预处理，读取的图像img1用来合成CAM，im用来获取x
-    # img1 = cv2.imread(path_img1, 1)[:, :, ::-1]
-    # img1 = np.float32(img1) / 255
-    # im = load_image_from_path(path_img1)
-    # x = preprocess_img(im, [0.4948052, 0.48568845, 0.44682974],
-    #                        [0.24580306, 0.24236229, 0.2603115])
-
-    if dataset != 'FGVC12':
-        #img2 = cv2.resize(cv2.imread(path_img, 1), (224, 224))[:, :, ::-1]
-        img2 = cv2.imread(path_img, 1)[:, :, ::-1]
-    else:
-        img2 = cv2.resize(cv2.imread(path_img, 1), (448, 448))[:, :, ::-1]
-
-    img2 = np.float32(img2) / 255
-    x = preprocess_image(img2,
-                         mean=[0.5, 0.5, 0.5],
-                         std=[0.5, 0.5, 0.5])
-
-    # 获取树模型，并装载预训练权重，最后前向推导树，获得决策链路
-    # pretrained保持false，否则会重新调取随机的权重，导致CAM不一致
-
-    model = SoftNBDT(
-        pretrained=False,
-        dataset=dataset,
-        arch=arch,
-        model=net,
-        classes=wnids
-    ).cuda()
-
-    decisions, leaf_to_prob, node_to_prob, predicted = forword_tree(ad_tensor, model, wnids, dataset)
-
-    # decision_to_wnid = get_decision_wnid(decisions[0])
-    # record_node_prob(node_to_prob, decision_to_wnid, './experiment/mask_leaf_record.txt', img_name)
-
-    # 获取一个包含所有叶节点对应cam图的字典，此处还未resize，再进行融合
-    # 模型哪一个layer
-
-    target_layers = None
-    if arch == "ResNet50":
-        target_layers = [model.model.layer4[-1]]
-    elif arch == 'DFLCNN':
-        target_layers = [model.model.conv5]
-    elif arch == 'vgg16':
-        target_layers = [model.model.features[-1]]
-    elif arch == 'ResNet18':
-        target_layers = [model.model.layer4[-1]]
-    elif arch == 'wrn28_10_cifar10':
-        target_layers = [model.model.features[-3][-1].body.conv2.conv]
-
-
-    if cam_method == 'efccam':
-        cam_dict = get_all_leaf_cam_efc(ad_tensor, net.cuda(), leaf_to_prob, num_cls,
-                                        cam_method, target_layers, path_img, img_name)
-    else:
-        cam_dict = get_all_leaf_cam_from_method(ad_tensor, net.cuda(), leaf_to_prob,
-                                                num_cls, cam_method, target_layers,
-                                                aug_smooth=False,
-                                                eigen_smooth=False)
-
-    # 生成所有叶节点热力图
-    generate_all_leaf_cam(img2, type_name, cam_dict, dataset, output_dir)
-    complex_w = compute_complex_weight(cam_dict, predicted)
-
-    #不同添加权重的方法:
-    if weight == 'simple':
-        image_dict, decisions_path_label, decisions_prob = fuse_leaf_cam_with_simple_w(decisions[0],
-                                                                                       img2, type_name, cam_dict,
-                                                                                       output_dir, wnids, predicted)
-    elif weight == 'complex':
-        image_dict, decisions_path_label, decisions_prob = fuse_leaf_cam_with_complex_w(decisions[0],img2, type_name,
-                                                                                        complex_w, cam_dict,
-                                                                                       output_dir, wnids, predicted)
-    else:
-        image_dict, decisions_path_label, decisions_prob = fuse_leaf_cam_without_w(decisions[0],
-                                                                                     img2, type_name, cam_dict,
-                                                                                     output_dir, wnids, predicted)
-    # image_dict, decisions_path_label, \
-    # decisions_prob = fuse_leaf_cam(decisions[0], img2,
-    #                                            type_name, cam_dict,
-    #                                            output_dir, wnids, predicted)
-
-    """
-    接下来基本都是HTML生成相关，相关参数可以args传入，设置一个默认值
-    """
-    color = '#cccccc'
-    vis_no_color_leaves = False  # 是否要为叶节点着色
-    vis_color_path_to = None  # ？？？
-    vis_color_nodes = tuple(decisions_path_label)
-    vis_node_conf = {}
-    vis_force_labels_left = {}
-    vis_leaf_images = False
-    vis_image_resize_factor = 1
-    vis_fake_sublabels = False  # 可以自己操作节点名称
-    vis_zoom = 1.5  # 控制大小？
-    vis_curved = True  # 是否要弯曲直线？
-    vis_sublabels = True  # 可以用来增加概率？
-    vis_height = 800
-    vis_width = 1200
-    vis_dark = False
-    vis_margin_top = 20
-    vis_margin_left = 250
-    vis_hide = []
-    vis_above_dy = 325
-    vis_below_dy = 475
-    vis_scale = 1
-    vis_root_y = 'null'
-    vis_colormap = 'colormap_annotated.png'
-
-    color_info = get_color_info(
-        G,
-        color,
-        color_leaves=not vis_no_color_leaves,
-        color_path_to=vis_color_path_to,
-        color_nodes=vis_color_nodes or ())
-
-    node_to_conf = generate_node_conf(vis_node_conf)
-
-    # 在构建数的过程中已经将所有的需要插入的图片完成了插入，并以href的形式出现
-    tree = build_tree(G, root,
-                      color_info=color_info,
-                      force_labels_left=vis_force_labels_left or [],
-                      dataset=dataset,
-                      include_leaf_images=vis_leaf_images,
-                      image_resize_factor=vis_image_resize_factor,
-                      include_fake_sublabels=vis_fake_sublabels,
-                      node_to_conf=node_to_conf,
-                      wnids=wnids)
-    # 为root插入图像
-    tree = change_root(tree, decisions[0], image_dict, root, path_img2)
-
-    if len(decisions_path_label) == len(image_dict):
-        Colors.green('trying to insert images into decision nodes')
-    else:
-        Colors.red('failed to insert because of unmatcheed number of wnidset and image path')
-
-    # 为中间节点、叶节点插入图像
-    if decisions[0][-1]['name'] == '(generated)':
-        insert_image_for_no_name(tree['children'], decisions_path_label, image_dict, decisions_prob,
-                                 vis_image_resize_factor)
-    else:
-        insert_image(tree['children'], decisions_path_label, image_dict, decisions_prob,
-                     vis_image_resize_factor)
-
-    fname = os.path.join(html_output, type_name + '_cam_tree')
-
-    parent = Path(fwd()).parent
-
-    generate_vis(
-        str(parent / 'nbdt/templates/tree-template-insert.html'), tree, fname,
-        zoom=vis_zoom,
-        straight_lines=not vis_curved,
-        show_sublabels=vis_sublabels,
-        height=vis_height,
-        width=vis_width,
-        dark=vis_dark,
-        margin_top=vis_margin_top,
-        margin_left=vis_margin_left,
-        hide=vis_hide or [],
-        above_dy=vis_above_dy,
-        below_dy=vis_below_dy,
-        scale=vis_scale,
-        root_y=vis_root_y,
-        colormap=vis_colormap)
-
-"""
-    对抗样本生成相关代码：
-"""
-
-def getAcc(model, img, class_index):
-    logit = model(img)
-    if type(logit) == tuple:
-        logit = logit[0] + logit[1] + 0.1 * logit[2]
-
-    if class_index == -1:
-        class_index = logit.max(1)[-1].item()
-
-    accuracy = F.softmax(logit, dim=1)[0][class_index]
-
-    return class_index, accuracy.item()
-
-def generate_attacked_sample(img_path: str, output_name: str,
-                             model, num_cls, H = 224, W = 224):
-    img1 = Image.open(img_path).convert('RGB').resize((H, W))
-
-    img_np = (np.array(np.expand_dims(np.transpose(img1, (2, 0, 1)), 0)) / 255).astype('float32')
-
-    classifier = PyTorchClassifier(
-        model=model,
-        loss=torch.nn.CrossEntropyLoss(),
-        input_shape=(3, H, W),
-        nb_classes=num_cls,
-        clip_values=(0., 1.0)
-    )
-    transform = transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ])
-    img = transform(img1)
-    img = img.unsqueeze(0).cuda()
-
-    class_index, accuracy = getAcc(model, img, -1)
-    print(class_index, accuracy)
-
-    #attack = DeepFool(classifier=classifier, max_iter=500, epsilon=1e-6)
-    attack = attack = FastGradientMethod(estimator=classifier, eps=0.05)
-
-    x_test_adv = attack.generate(x=img_np)
-    x_test_adv = np.clip(x_test_adv, 0., 1.)
-
-    print(getAcc(model, torch.from_numpy(x_test_adv).cuda(),-1))
-    # plt.figure(figsize=(10, 10))
-    # plt.subplot(121)
-    # plt.axis('off')
-    # plt.imshow(img1)
-    # plt.subplot(122)
-    # plt.axis('off')
-    # plt.imshow(np.transpose(x_test_adv[0], (1, 2, 0)))
-    # plt.show()
-    result_BGR = cv2.cvtColor((np.transpose(255 * x_test_adv[0], (1,2,0))), cv2.COLOR_RGB2BGR)
-    cv2.imwrite(output_name, result_BGR)
-    return torch.from_numpy(x_test_adv).cuda()
 
 ############################################################
 
@@ -1749,39 +1538,6 @@ def get_decision_wnid(decisions):
 
 def calling_torchvision_model_pth(pth_path, cls_num):
     return None
-
-def calling_resnet_modified(pth_path, ):
-    state_dict = torch.load(pth_path, map_location='cpu')
-    new_state = collections.OrderedDict(
-        [(k.replace('linear', 'fc'), v) if k.find('linear') != -1 else (k, v) for k, v in state_dict.items()])
-    new_state = collections.OrderedDict(
-        [(k.replace('shortcut', 'downsample'), v) if k.find('shortcut') != -1 else (k, v) for k, v in
-         new_state.items()])
-
-    resnet = models.resnet18(pretrained=False)
-    resnet.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=3, bias=False)
-    resnet.fc = nn.Linear(in_features=512, out_features=10, bias=True)
-    resnet.load_state_dict(new_state)
-    return resnet
-
-
-def calling_resnet_modified_pth(pth_path):
-    state_dict = torch.load(pth_path, map_location='cpu')['net']
-
-    new_state = collections.OrderedDict(
-        [(k.replace('module.', ''), v) for k, v in state_dict.items()])
-    new_state = collections.OrderedDict(
-        [(k.replace('linear', 'fc'), v) if k.find('linear') != -1 else (k, v) for k, v in new_state.items()])
-    new_state = collections.OrderedDict(
-        [(k.replace('shortcut', 'downsample'), v) if k.find('shortcut') != -1 else (k, v) for k, v in
-         new_state.items()])
-
-    resnet = models.resnet18(pretrained=False)
-    resnet.conv1 = nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
-    resnet.fc = nn.Linear(in_features=512, out_features=10, bias=True)
-    resnet.load_state_dict(new_state)
-    return resnet
-
 
 def call_pth_model(arch:str, path:str, cls_num:int, device = 'cuda'):
     if device == 'cuda':
