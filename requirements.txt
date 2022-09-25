@@ -2,7 +2,7 @@ detail==0.2.2
 matplotlib==3.3.4
 networkx==2.5.1
 nltk==3.6.7
-numpy==1.19.5
+numpy==1.22.0
 opencv_python==4.4.0.42
 Pillow==9.2.0
 pytorchcv==0.0.67
