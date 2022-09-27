@@ -108,6 +108,8 @@
 ***
 依赖环境：在[requirements.txt](https://github.com/ZO1DB3RG/VNBDT/blob/main/requirements.txt) 中
 
+    python 3.6.2 torch 1.10.1 cuda 10.2
+
     detail==0.2.2
     matplotlib==3.3.4
     networkx==2.5.1
