@@ -6,18 +6,18 @@ from nbdt.utils import DATASET_TO_NUM_CLASSES
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--cam', default='gradcam', type=str, help='class activate mapping methods')
-parser.add_argument('--dataset', default='FGVC10', type=str, help='dataset name')
-parser.add_argument('--arch', default='DFLCNN', type=str, help='name of the architecture')
+parser.add_argument('--dataset', default='Imagenet10', type=str, help='dataset name')
+parser.add_argument('--arch', default='ResNet50', type=str, help='name of the architecture')
 parser.add_argument('--method', default='induced', type=str, help='tree type, others are pro or random')
-parser.add_argument('--pth_path', default='/home/lzl001/FGVC/DFL-CNN/weight_525/model_best.pth.tar', type=str, help='class activate mapping methods')
+parser.add_argument('--pth_path', default='/home/lzl001/NBDT/neural-backed-decision-trees/checkpoint/ckpt-Imagenet10-ResNet50-lr0.01-SoftTreeSupLoss_induced.pth', type=str, help='class activate mapping methods')
 parser.add_argument('--merge', default='simple', type=str, help='the way to merge the cam')
 
-parser.add_argument('--img_dir', default='/home/lzl001/VNBDT/node_2', type=str, help='image folder waiting infered and explained')
+parser.add_argument('--img_dir', default="/data/LZL/imagenet-10/test/Ibizan_hound/n0209124400000864.jpg", type=str, help='image folder waiting infered and explained')
 parser.add_argument('--output_dir', default='out', type=str, help='Store CAM')
 parser.add_argument('--html_output', default='html', type=str, help='Store html, should be the same father with output_dir')
 
 parser.add_argument('--name', default='', type=str, help='something you want your file name to be')
-parser.add_argument('--device', default='0', type=str, help='device')
+parser.add_argument('--device', default='3', type=str, help='device')
 
 if __name__ == '__main__':
 
@@ -80,29 +80,38 @@ if __name__ == '__main__':
         os.makedirs(args.html_output)
 
     path_list = []
-
-    if os.path.exists(args.img_dir):
-        if os.listdir(args.img_dir) != 0:
-            path_list = [os.path.join(args.img_dir, i) for i in os.listdir(args.img_dir)]
-        else:
-            print("No PIC for explain")
-
-
-    ori_cls = os.path.split(args.img_dir)[-1]
-
-    """
-    efccam的热力图要缩小到等高宽
-    size = None ---> 用原图大小，更多细节
-    size = (224, 224) ---> 实验大小，供选择
-    """
-    for img in path_list:
+    if os.path.isdir(args.img_dir):
+        if os.path.exists(args.img_dir):
+            if os.listdir(args.img_dir) != 0:
+                path_list = [os.path.join(args.img_dir, i) for i in os.listdir(args.img_dir)]
+            else:
+                print("No PIC for explain")
+        ori_cls = os.path.split(args.img_dir)[-1]
+        """
+        efccam的热力图要缩小到等高宽
+        size = None ---> 用原图大小，更多细节
+        size = (224, 224) ---> 实验大小，供选择
+        """
+        for img in path_list:
+            if args.method != 'pro' and args.method != 'random':
+                generate_html(G, root, args.arch, args.dataset, args.cam, img, net, wnids, num_cls,
+                              args.output_dir, args.html_output, (448,448), 's', args.merge, ori_cls)
+                # generate_html(G, root, arch, dataset, cam_method, img, net, wnids, num_cls,
+                #               output_dir, html_output, (448,448),'w', 'w')
+                # generate_html(G, root, arch, dataset, cam_method, img, net, wnids, num_cls,
+                #               output_dir, html_output, (448,448),'c', 'complex')
+            else:
+                generate_pro_html(G, root, args.method, path, args.arch, args.dataset, args.cam, img, net, wnids, num_cls,
+                                  args.output_dir, args.html_output, (448,448),'s1', args.merge, ori_cls)
+    else:
+        ori_cls = os.path.split(args.img_dir)[-2]
         if args.method != 'pro' and args.method != 'random':
-            generate_html(G, root, args.arch, args.dataset, args.cam, img, net, wnids, num_cls,
+            generate_html(G, root, args.arch, args.dataset, args.cam, args.img_dir, net, wnids, num_cls,
                           args.output_dir, args.html_output, (448,448), 's', args.merge, ori_cls)
             # generate_html(G, root, arch, dataset, cam_method, img, net, wnids, num_cls,
             #               output_dir, html_output, (448,448),'w', 'w')
             # generate_html(G, root, arch, dataset, cam_method, img, net, wnids, num_cls,
             #               output_dir, html_output, (448,448),'c', 'complex')
         else:
-            generate_pro_html(G, root, args.method, path, args.arch, args.dataset, args.cam, img, net, wnids, num_cls,
+            generate_pro_html(G, root, args.method, path, args.arch, args.dataset, args.cam, args.img_dir, net, wnids, num_cls,
                               args.output_dir, args.html_output, (448,448),'s1', args.merge, ori_cls)
