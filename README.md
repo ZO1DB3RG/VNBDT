@@ -5,13 +5,21 @@
 
 ***
 
-#### 主代码请浏览 [**visualize_nbdt.py**](https://github.com/ZO1DB3RG/VNBDT/blob/main/visualize_nbdt.py)
+#### 主代码请浏览 [**vis_nbdt.py**](https://github.com/ZO1DB3RG/VNBDT/blob/main/vis_nbdt.py) 改代码主要生成不带指标测试的可视化树
+#### 如果想生成带有指标的可视化树可以运行代码 [**vnbdt_quant.py**](https://github.com/ZO1DB3RG/VNBDT/blob/main/vnbdt_quant.py) 
+<div align=center><img src="https://github.com/ZO1DB3RG/VNBDT/blob/main/img/vnbdt_withquant.png"/></div>
 
 #### 大部分函数在 [**vnbdt.py**](https://github.com/ZO1DB3RG/VNBDT/blob/main/vnbdt.py)
 
 **可直接执行**：
 
-    python visualize_nbdt.py
+    python vis_nbdt.py
+
+**或者**：    
+    
+    python vnbdt_quant.py
+
+**以上两个代码可支持输入一张图像or一个文件夹，具体需要填写的参数见代码**：
 ***
 ## **可选择项**：
 ### **网络结构**：
