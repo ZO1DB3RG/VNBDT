@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 import numpy.ma as ma
 from PIL import Image
-from matplotlib import pyplot as plt
 from nbdt.model import SoftNBDT, HardNBDT
 
 from DFLCNN.DFL import DFL_VGG16
@@ -19,7 +18,6 @@ import torch
 import collections
 import torchvision.models as models
 import torch.nn as nn
-import torch.nn.functional as F
 from nbdt.hierarchy import generate_hierarchy
 from pathlib import Path
 from torchvision import transforms
@@ -35,15 +33,11 @@ from pytorch_grad_cam import GradCAM, \
     LayerCAM, \
     FullGrad, \
     EFC_CAM
-from pytorch_grad_cam import GuidedBackpropReLUModel
 from pytorch_grad_cam.utils.image import show_cam_on_image, \
     deprocess_image, \
     preprocess_image, preprocess_image_resize
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import scale_cam_image
-
-from art.attacks.evasion import *
-from art.estimators.classification import PyTorchClassifier
 
 NAME_TO_METHODS = {"gradcam": GradCAM,
                    "scorecam": ScoreCAM,
@@ -192,18 +186,19 @@ def generate_vis(path_template, data, fname, zoom=2, straight_lines=True,
             "CONFIG_COLORMAP",
             f'''<img src="{colormap}" style="
         position: absolute;
-        top: -50px;
+        top: 600px;
         left: 50px;
         height: 250px;
-        border: 4px solid #ccc;">''' if isinstance(colormap, str) and os.path.exists(colormap) else ''
+        border: 4px solid #ccc;
+        z-index: -1">''' if isinstance(colormap, str) else ''
         )
 
     os.makedirs(out_dir, exist_ok=True)
-    path_html = f'{out_dir}/{fname}.html'
+    path_html = f'{fname}.html'
     with open(path_html, 'w', encoding='utf-8') as f:
         f.write(html)
 
-    Colors.green('==> Wrote HTML to {}'.format(path_html))
+    # Colors.green('==> Wrote HTML to {}'.format(path_html))
 
 
 def get_color_info(G, color, color_leaves, color_path_to=None, color_nodes=()):
@@ -485,12 +480,12 @@ def forword_tree(x, model, wnids, dataset):
     leaf_to_prob = {wnids.index(k): v for k, v in leaf_to_prob.items()}
     _, predicted = outputs.max(1)
     cls = DATASET_TO_CLASSES[dataset][predicted[0]]
-    print('Prediction:', cls, '// Decisions:',
-          ', '.join(['{} ({:.2f}%)'.format(info['name'], info['prob'] * 100) for
-                     info in decisions[0]
-                     ][1:]))
+    # print('Prediction:', cls, '// Decisions:',
+    #       ', '.join(['{} ({:.2f}%)'.format(info['name'], info['prob'] * 100) for
+    #                  info in decisions[0]
+    #                  ][1:]))
 
-    return decisions, leaf_to_prob, node_to_prob, predicted[0].item()
+    return decisions, leaf_to_prob, node_to_prob, predicted[0].item(), cls
 
 def forword_node_logit(x, model):
     """
@@ -734,9 +729,9 @@ def fuse_leaf_cam_with_simple_w(decisions, img, type_name,
             os.makedirs(os.path.join(output, type_name))
         path_cam_img = os.path.join(os.path.join(output, type_name), name)
         cv2.imwrite(path_cam_img, cam_image)
-        path_cam_img = os.path.join('..', path_cam_img)
+        path_cam_img = os.path.join('..', path_cam_img.split('/')[-3], path_cam_img.split('/')[-2], path_cam_img.split('/')[-1])
 
-        Colors.green(name + ' has been generated')
+        # Colors.green(name + ' has been generated')
         if decisions[ind + 1]['node'] != None:
             image_dict[decisions[ind + 1]['node'].wnid] = path_cam_img
         else:
@@ -813,9 +808,9 @@ def fuse_leaf_cam_with_complex_w(decisions, img, type_name,complex_w,
             os.makedirs(os.path.join(output, type_name))
         path_cam_img = os.path.join(os.path.join(output, type_name), name)
         cv2.imwrite(path_cam_img, cam_image)
-        path_cam_img = os.path.join('..', path_cam_img)
+        path_cam_img = os.path.join('..', path_cam_img.split('/')[-3], path_cam_img.split('/')[-2], path_cam_img.split('/')[-1])
 
-        Colors.green(name + ' has been generated')
+        # Colors.green(name + ' has been generated')
         if decisions[ind + 1]['node'] != None:
             image_dict[decisions[ind + 1]['node'].wnid] = path_cam_img
         else:
@@ -866,9 +861,9 @@ def fuse_leaf_cam_without_w(decisions, img, type_name,
             os.makedirs(os.path.join(output, type_name))
         path_cam_img = os.path.join(os.path.join(output, type_name), name)
         cv2.imwrite(path_cam_img, cam_image)
-        path_cam_img = os.path.join('..', path_cam_img)
+        path_cam_img = os.path.join('..', path_cam_img.split('/')[-3],path_cam_img.split('/')[-2], path_cam_img.split('/')[-1])
 
-        Colors.green(name + ' has been generated')
+        # Colors.green(name + ' has been generated')
         if decisions[ind + 1]['node'] != None:
             image_dict[decisions[ind + 1]['node'].wnid] = path_cam_img
         else:
@@ -967,158 +962,6 @@ def generate_cam_mask_one_sample(img, type_name, cam, output):
         cv2.imwrite(path_cam_img, img2remove)
     Colors.cyan("mask of img {} has been generated".format(type_name))
 
-def generate_cam_mask_with_simple_w(decisions, img, type_name, cam_dict, output):
-    H, W, _ = img.shape
-    decicion_num = len(decisions)
-    for ind in range(decicion_num - 1):
-        if not os.path.exists(os.path.join(os.path.join(output, type_name), 'node_'+str(ind + 1))):
-            os.makedirs(os.path.join(os.path.join(output, type_name), 'node_'+str(ind + 1)))
-
-        # 获取该节点子节点概率和叶节点列表
-        child_node = decisions[ind]['node'].new_to_old_classes
-        child_prob = decisions[ind]['child_prob']
-
-        cam = np.zeros(cam_dict[0][1].shape, dtype=np.float32)
-        for i in range(2):
-            w = child_prob[i]
-            for node in child_node[i]:
-                cam += w.detach().cpu().numpy() * cam_dict[node][1]
-
-        scaled = scale_cam_image([cam], (W, H))[0, :]  # resize
-        img2keep = img.copy()
-        img2keep[scaled <= 0.3] = 0  # 保留重要区域
-        scaled_ = ma.array(scaled, mask=scaled > 0.3)
-
-        max,min = scaled_.max(), scaled_.min()
-        scaled_ = ((scaled_ - min) / (max - min))
-        remove_pixel = scaled_.compressed()
-        remove_pixel = remove_pixel[remove_pixel>0]
-        # plt.hist(remove_pixel,bins = 100)
-        # plt.show()
-        remove_pixel = [np.percentile(remove_pixel, x * 10) for x in range(1,10)]
-        scaled_ = scaled_.filled(0)
-
-
-        for i, odd in enumerate(remove_pixel):
-            name = type_name + '_masked_leaf_' + str(ind) + '_' + str(int(i+1)) + '.jpg'
-            #可以在此处修改遮盖方式xxxxx
-
-            img2remove = img.copy()
-
-            img2remove[scaled_ <= odd] = 0
-
-            img2remove = img2keep + img2remove
-
-            path_cam_img = os.path.join(os.path.join(os.path.join(output, type_name), 'node_'+str(ind + 1)), name)
-            cv2.imwrite(path_cam_img, img2remove)
-
-            #Colors.green(name + ' has been generated')
-        Colors.cyan("decision {} of img {} has been generated".format(str(ind), type_name))
-
-def generate_cam_mask_with_complex_w(decisions, img, type_name, cam_dict,
-                                     output, complex_w, predicted):
-    H, W, _ = img.shape
-    decicion_num = len(decisions)
-    for ind in range(decicion_num - 1):
-        if not os.path.exists(os.path.join(os.path.join(output, type_name), 'node_'+str(ind + 1))):
-            os.makedirs(os.path.join(os.path.join(output, type_name), 'node_'+str(ind + 1)))
-
-        # 获取该节点子节点概率和叶节点列表
-        child_node = decisions[ind]['node'].new_to_old_classes
-        w_dict = {}
-        cam = np.zeros(cam_dict[0][1].shape, dtype=np.float32)
-
-        for i in range(2):
-            for node in child_node[i]:
-                w_dict[node] = complex_w[node]
-
-        m = np.max(list(w_dict.values()))
-        for k in list(w_dict.keys()):
-            w_dict[k] = 1 - (w_dict[k] / m)
-
-        for i in range(2):
-            for node in child_node[i]:
-                cam += w_dict[node] * cam_dict[node][1]
-
-        scaled = scale_cam_image([cam], (W, H))[0, :]  # resize
-        img2keep = img.copy()
-        img2keep[scaled <= 0.3] = 0  # 保留重要区域
-        scaled_ = ma.array(scaled, mask=scaled > 0.3)
-
-        max, min = scaled_.max(), scaled_.min()
-        scaled_ = ((scaled_ - min) / (max - min))
-        remove_pixel = scaled_.compressed()
-        remove_pixel = remove_pixel[remove_pixel>0]
-
-        remove_pixel = [np.percentile(remove_pixel, x * 10) for x in range(1,10)]
-        scaled_ = scaled_.filled(0)
-
-
-        for i, odd in enumerate(remove_pixel):
-            name = type_name + '_masked_leaf_' + str(ind) + '_' + str(int(i+1)) + '.jpg'
-            #可以在此处修改遮盖方式xxxxx
-
-            img2remove = img.copy()
-
-            img2remove[scaled_ <= odd] = 0
-
-            img2remove = img2keep + img2remove
-
-            path_cam_img = os.path.join(os.path.join(os.path.join(output, type_name), 'node_'+str(ind + 1)), name)
-            cv2.imwrite(path_cam_img, img2remove)
-
-            #Colors.green(name + ' has been generated')
-        Colors.cyan("decision {} of img {} has been generated".format(str(ind), type_name))
-
-def generate_cam_mask_no_w(decisions, img, type_name, cam_dict, output):
-    H, W, _ = img.shape
-    decicion_num = len(decisions)
-    for ind in range(decicion_num - 1):
-        if not os.path.exists(os.path.join(os.path.join(output, type_name), 'node_'+str(ind + 1))):
-            os.makedirs(os.path.join(os.path.join(output, type_name), 'node_'+str(ind + 1)))
-
-        # 获取该节点子节点概率和叶节点列表
-        child_node = decisions[ind]['node'].new_to_old_classes
-        child_prob = decisions[ind]['child_prob']
-
-        cam = np.zeros(cam_dict[0][1].shape, dtype=np.float32)
-        for i in range(2):
-            w = child_prob[i]
-            for node in child_node[i]:
-                cam += cam_dict[node][1]
-
-        scaled = scale_cam_image([cam], (W, H))[0, :]  # resize
-        img2keep = img.copy()
-        img2keep[scaled <= 0.3] = 0  # 保留重要区域
-        scaled_ = ma.array(scaled, mask=scaled > 0.3)
-
-        max,min = scaled_.max(), scaled_.min()
-        scaled_ = ((scaled_ - min) / (max - min))
-        remove_pixel = scaled_.compressed()
-        remove_pixel = remove_pixel[remove_pixel>0]
-        # plt.hist(remove_pixel,bins = 100)
-        # plt.show()
-        remove_pixel = [np.percentile(remove_pixel, x * 10) for x in range(1,10)]
-        scaled_ = scaled_.filled(0)
-
-
-        for i, odd in enumerate(remove_pixel):
-            name = type_name + '_masked_leaf_' + str(ind) + '_' + str(int(i+1)) + '.jpg'
-            #可以在此处修改遮盖方式xxxxx
-
-            img2remove = img.copy()
-
-            img2remove[scaled_ <= odd] = 0
-
-            img2remove = img2keep + img2remove
-
-            path_cam_img = os.path.join(os.path.join(os.path.join(output, type_name), 'node_'+str(ind + 1)), name)
-            cv2.imwrite(path_cam_img, img2remove)
-
-            #Colors.green(name + ' has been generated')
-        Colors.cyan("decision {} of img {} has been generated".format(str(ind), type_name))
-
-###############################################################################
 
 def get_layer(arch, model):
     if arch == "ResNet50":
@@ -1135,7 +978,7 @@ def get_layer(arch, model):
     return target_layers
 
 def generate_html(G, root, arch, dataset, cam_method, path_img, net, wnids, num_cls,
-                  output_dir, html_output, size, name, weight: True):
+                  output_dir, html_output, size, name, weight, ori_cls: None):
     """
     :param G: tree structure
     :param root: root node
@@ -1154,9 +997,10 @@ def generate_html(G, root, arch, dataset, cam_method, path_img, net, wnids, num_
     :return: get explanation
     """
 
-    path_img2 = os.path.join('..', path_img)
-    type_name = os.path.split(path_img)[1].split('.')[0] \
-                + '_' + cam_method + '-' + name
+    path_img2 = os.path.join('..', os.path.join(path_img.split('/')[-2], path_img.split('/')[-1])) #该路径用于插入root图像
+    type_name = os.path.split(path_img)[1].split('.')[0].split('_')[-1] \
+                    + '_' + cam_method + '-' + weight
+
     img_name = os.path.split(path_img)[1].split('.')[0]
 
     # 图像读取和预处理，读取的图像img1用来合成CAM，im用来获取x
@@ -1190,8 +1034,11 @@ def generate_html(G, root, arch, dataset, cam_method, path_img, net, wnids, num_
         classes=wnids
     ).cuda()
 
-    decisions, leaf_to_prob, node_to_prob, predicted = forword_tree(x.cuda(), model, wnids, dataset)
-
+    decisions, leaf_to_prob, node_to_prob, predicted, cls = forword_tree(x.cuda(), model, wnids, dataset)
+    if ori_cls == cls:
+        type_name = 'T-' + type_name
+    else:
+        type_name = 'F-' + type_name
     # decision_to_wnid = get_decision_wnid(decisions[0])
     # record_node_prob(node_to_prob, decision_to_wnid, './experiment/mask_leaf_record.txt', img_name)
 
@@ -1208,6 +1055,11 @@ def generate_html(G, root, arch, dataset, cam_method, path_img, net, wnids, num_
                                                 num_cls, cam_method, target_layers,
                                                 aug_smooth=False,
                                                 eigen_smooth=False)
+
+    # if len(cam_dict) != 0:
+    #     print("============================= successfully get all leaf CAM =============================")
+    # else:
+    #     print("============================= fail to get the leaf CAM, nothing here =============================")
 
     # 生成所有叶节点热力图
     #generate_all_leaf_cam(img2, type_name, cam_dict, dataset, output_dir)
@@ -1257,7 +1109,7 @@ def generate_html(G, root, arch, dataset, cam_method, path_img, net, wnids, num_
     vis_below_dy = 475
     vis_scale = 1
     vis_root_y = 'null'
-    vis_colormap = 'colormap_annotated.png'
+    vis_colormap = os.path.join('..', os.path.split(output_dir)[-1], type_name, 'metrics.png')
 
     color_info = get_color_info(
         G,
@@ -1281,10 +1133,9 @@ def generate_html(G, root, arch, dataset, cam_method, path_img, net, wnids, num_
     # 为root插入图像
     tree = change_root(tree, decisions[0], image_dict, root, path_img2, dataset)
 
-    if len(decisions_path_label) == len(image_dict):
-        Colors.green('trying to insert images into decision nodes')
-    else:
+    if len(decisions_path_label) != len(image_dict):
         Colors.red('failed to insert because of unmatcheed number of wnidset and image path')
+        exit(1)
 
     # 为中间节点、叶节点插入图像
     if decisions[0][-1]['name'] == '(generated)':
@@ -1316,10 +1167,10 @@ def generate_html(G, root, arch, dataset, cam_method, path_img, net, wnids, num_
         colormap=vis_colormap)
 
 def generate_pro_html(G, root, method, path, arch, dataset, cam_method, path_img, net, wnids, num_cls,
-                      output_dir, html_output, size, name, weight:True):
-    path_img2 = os.path.join('..', path_img)
-    type_name = os.path.split(path_img)[1].split('.')[0] \
-                + '_' + method + '_' + dataset + '_' + arch + '_' + cam_method + '-' + name
+                      output_dir, html_output, size, name, weight, ori_cls):
+    path_img2 = os.path.join('..', os.path.join(path_img.split('/')[-2], path_img.split('/')[-1]))  # 该路径用于插入root图像
+    type_name = os.path.split(path_img)[1].split('.')[0].split('_')[-1] \
+                 + '_' + cam_method + '-' + weight
     img_name = os.path.split(path_img)[1].split('.')[0]
 
     # 图像读取和预处理，读取的图像img1用来合成CAM，im用来获取x
@@ -1352,8 +1203,12 @@ def generate_pro_html(G, root, method, path, arch, dataset, cam_method, path_img
         model=net,
         classes=wnids
     ).cuda()
-    decisions, leaf_to_prob, node_to_prob, predicted = forword_tree(x.cuda(), model, wnids, dataset)
+    decisions, leaf_to_prob, node_to_prob, predicted, cls = forword_tree(x.cuda(), model, wnids, dataset)
 
+    if ori_cls == cls:
+        type_name = 'T-' + type_name
+    else:
+        type_name = 'F-' + type_name
     # decision_to_wnid = get_decision_wnid(decisions[0])
     # record_node_prob(node_to_prob, decision_to_wnid, './experiment/mask_leaf_record.txt', img_name)
 
@@ -1373,7 +1228,7 @@ def generate_pro_html(G, root, method, path, arch, dataset, cam_method, path_img
                                                 eigen_smooth=False)
 
     # 生成所有叶节点热力图
-    generate_all_leaf_cam(img2, type_name, cam_dict, dataset, output_dir)
+    # generate_all_leaf_cam(img2, type_name, cam_dict, dataset, output_dir)
     complex_w = compute_complex_weight(cam_dict, predicted)
 
     #不同添加权重的方法:
@@ -1419,7 +1274,7 @@ def generate_pro_html(G, root, method, path, arch, dataset, cam_method, path_img
     vis_below_dy = 475
     vis_scale = 1
     vis_root_y = 'null'
-    vis_colormap = 'colormap_annotated.png'
+    vis_colormap = os.path.join('..', os.path.split(output_dir)[-1], type_name, 'metrics.png')
 
     color_info = get_color_info(
         G,
@@ -1443,10 +1298,9 @@ def generate_pro_html(G, root, method, path, arch, dataset, cam_method, path_img
     # 为root插入图像
     tree = change_root(tree, decisions[0], image_dict, root, path_img2, dataset)
 
-    if len(decisions_path_label) == len(image_dict):
-        Colors.green('trying to insert images into decision nodes')
-    else:
+    if len(decisions_path_label) != len(image_dict):
         Colors.red('failed to insert because of unmatcheed number of wnidset and image path')
+        exit(0)
 
     # 为中间节点、叶节点插入图像
     if decisions[0][-1]['name'] == '(generated)':
@@ -1679,3 +1533,108 @@ def insert_image_for_no_name(tree_node, label_list, image_dict, decisions_prob,
                 insert_image_for_no_name(node['children'], label_list, image_dict, decisions_prob)
             else:
                 pass
+
+
+def generate_cam_mask_with_simple_w(decisions, img, type_name, cam_dict, output):
+    H, W, _ = img.shape
+    decicion_num = len(decisions)
+    for ind in range(decicion_num - 1):
+        if not os.path.exists(os.path.join(os.path.join(output, type_name), 'node_'+str(ind + 1))):
+            os.makedirs(os.path.join(os.path.join(output, type_name), 'node_'+str(ind + 1)))
+
+        # 获取该节点子节点概率和叶节点列表
+        child_node = decisions[ind]['node'].new_to_old_classes
+        child_prob = decisions[ind]['child_prob']
+
+        cam = np.zeros(cam_dict[0][1].shape, dtype=np.float32)
+        for i in range(2):
+            w = child_prob[i]
+            for node in child_node[i]:
+                cam += w.detach().cpu().numpy() * cam_dict[node][1]
+
+        scaled = scale_cam_image([cam], (W, H))[0, :]  # resize
+
+        img2keep = img.copy()
+        img2keep[scaled <= 0.3] = 0  # 保留重要区域
+        scaled_ = ma.array(scaled, mask=scaled > 0.3)
+
+        max,min = scaled_.max(), scaled_.min()
+        scaled_ = ((scaled_ - min) / (max - min))
+        remove_pixel = scaled_.compressed()
+        remove_pixel = remove_pixel[remove_pixel>0]
+        # plt.hist(remove_pixel,bins = 100)
+        # plt.show()
+        remove_pixel = [np.percentile(remove_pixel, x * 10) for x in range(1,10)]
+        scaled_ = scaled_.filled(0)
+
+
+        for i, odd in enumerate(remove_pixel):
+            name = type_name + '_masked_leaf_' + str(ind) + '_' + str(int(i+1)) + '.jpg'
+            #可以在此处修改遮盖方式xxxxx
+
+            img2remove = img.copy()
+
+            img2remove[scaled_ <= odd] = 0
+
+            img2remove = img2keep + img2remove
+
+            path_cam_img = os.path.join(os.path.join(os.path.join(output, type_name), 'node_'+str(ind + 1)), name)
+            cv2.imwrite(path_cam_img, img2remove)
+
+            #Colors.green(name + ' has been generated')
+        Colors.cyan("decision {} of img {} has been generated".format(str(ind), type_name))
+
+def generate_cam_mask_with_complex_w(decisions, img, type_name, cam_dict,
+                                     output, complex_w, predicted):
+    H, W, _ = img.shape
+    decicion_num = len(decisions)
+    for ind in range(decicion_num - 1):
+        if not os.path.exists(os.path.join(os.path.join(output, type_name), 'node_'+str(ind + 1))):
+            os.makedirs(os.path.join(os.path.join(output, type_name), 'node_'+str(ind + 1)))
+
+        # 获取该节点子节点概率和叶节点列表
+        child_node = decisions[ind]['node'].new_to_old_classes
+        w_dict = {}
+        cam = np.zeros(cam_dict[0][1].shape, dtype=np.float32)
+
+        for i in range(2):
+            for node in child_node[i]:
+                w_dict[node] = complex_w[node]
+
+        m = np.max(list(w_dict.values()))
+        for k in list(w_dict.keys()):
+            w_dict[k] = 1 - (w_dict[k] / m)
+
+        for i in range(2):
+            for node in child_node[i]:
+                cam += w_dict[node] * cam_dict[node][1]
+
+        scaled = scale_cam_image([cam], (W, H))[0, :]  # resize
+        img2keep = img.copy()
+        img2keep[scaled <= 0.3] = 0  # 保留重要区域
+        scaled_ = ma.array(scaled, mask=scaled > 0.3)
+
+        max, min = scaled_.max(), scaled_.min()
+        scaled_ = ((scaled_ - min) / (max - min))
+        remove_pixel = scaled_.compressed()
+        remove_pixel = remove_pixel[remove_pixel>0]
+
+        remove_pixel = [np.percentile(remove_pixel, x * 10) for x in range(1,10)]
+        scaled_ = scaled_.filled(0)
+
+
+        for i, odd in enumerate(remove_pixel):
+            name = type_name + '_masked_leaf_' + str(ind) + '_' + str(int(i+1)) + '.jpg'
+            #可以在此处修改遮盖方式xxxxx
+
+            img2remove = img.copy()
+
+            img2remove[scaled_ <= odd] = 0
+
+            img2remove = img2keep + img2remove
+
+            path_cam_img = os.path.join(os.path.join(os.path.join(output, type_name), 'node_'+str(ind + 1)), name)
+            cv2.imwrite(path_cam_img, img2remove)
+
+            #Colors.green(name + ' has been generated')
+        Colors.cyan("decision {} of img {} has been generated".format(str(ind), type_name))

@@ -1,10 +1,5 @@
-import os
-
 from vnbdt import *
-import cv2
-from nbdt.model import SoftNBDT, HardNBDT
-from nbdt.models import ResNet18, wrn28_10_cifar10, wrn28_10_cifar100, wrn28_10  # use wrn28_10 for TinyImagenet200
-# os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 # 定义获取图的函数
 
 if __name__ == '__main__':
@@ -32,6 +27,9 @@ if __name__ == '__main__':
         Emo(PARA美学数据的情感分类数据集)，
         'FGVC', 'FGVC12','FGVC10': FGVC飞行器数据集的子类
         'Imagenet10': imagenet10子类
+    如果需要扩展自己想要的数据集，首先需要在nbdt/hierarchies中创建空文件夹（数据集名如Emo），在nbdt/wnids中创建
+    对应名称的txt文件（如Emo.txt）并输入对应分类数量的ID，最后在nbdt/utils.py中增加对应数据集的各类信息，才能保证
+    代码能在新数据集上运行
     """
 
     method = 'induced'
@@ -48,9 +46,6 @@ if __name__ == '__main__':
     """
 
     pth_path = '/home/lzl001/NBDT/neural-backed-decision-trees/checkpoint/ckpt-Imagenet10-ResNet50-lr0.01-SoftTreeSupLoss_induced.pth'
-    #tar_path = '/home/lzl001/VNBDT/checkpoints/male_emo25_71.tar'
-    #tar_path = '/home/lzl001/VNBDT/checkpoints/female_emo33_75.tar'
-    #tar_path = '/home/lzl001/FGVC/DFL-CNN/weight/model_best.pth.tar'
 
     """
     支持pth, pkl, tar三种形式的模型文件
