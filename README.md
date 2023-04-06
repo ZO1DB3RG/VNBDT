@@ -20,6 +20,12 @@
     python vnbdt_quant.py
 
 **以上两个代码可支持输入一张图像or一个文件夹，具体需要填写的参数见代码**：
+
+**以下两个代码是计算iou与afc两个指标，用以评价模型对不同树结构or不同类别的鲁棒性**：
+
+    python vnbdt_quant_for_all_class.py
+    python vnbdt_quant_for_different_tree.py
+    
 ***
 ## **可选择项**：
 ### **网络结构**：
