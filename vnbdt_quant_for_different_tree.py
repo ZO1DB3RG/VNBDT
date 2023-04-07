@@ -19,12 +19,12 @@ parser.add_argument('--dataset', default='Imagenet10', type=str, help='dataset n
 parser.add_argument('--arch', default='ResNet50', type=str, help='name of the architecture')
 parser.add_argument('--method', default='induced', type=str, help='tree type, others are pro or random')
 parser.add_argument('--induced_pth_path', default='/home/lzl001/NBDT/neural-backed-decision-trees/checkpoint/ckpt-Imagenet10-ResNet50-lr0.01-SoftTreeSupLoss_induced.pth', type=str, help='class activate mapping methods')
-parser.add_argument('--pro_pth_path', default='/home/lzl001/NBDT/neural-backed-decision-trees/checkpoint/ckpt-Imagenet10-ResNet50-lr0.01-SoftTreeSupLoss_pro.pth', type=str, help='class activate mapping methods')
-parser.add_argument('--random_pth_path', default='/home/lzl001/NBDT/neural-backed-decision-trees/checkpoint/ckpt-Imagenet10-ResNet50-lr0.01-SoftTreeSupLoss_random.pth', type=str, help='class activate mapping methods')
+parser.add_argument('--pro_pth_path', default='/home/lzl001/NBDT/neural-backed-decision-trees/checkpoint/ckpt-Imagenet10-ResNet50-lr0.01-SoftTreeSupLoss_induced.pth', type=str, help='class activate mapping methods')
+parser.add_argument('--random_pth_path', default='/home/lzl001/NBDT/neural-backed-decision-trees/checkpoint/ckpt-Imagenet10-ResNet50-lr0.01-SoftTreeSupLoss_induced.pth', type=str, help='class activate mapping methods')
 parser.add_argument('--merge', default='simple', type=str, help='the way to merge the cam')
 
 parser.add_argument('--img_dir', default="/data/LZL/imagenet-10/test", type=str, help='image folder waiting infered and explained')
-parser.add_argument('--plot_name', default="metric_3_tree", type=str, help='name of the final plot')
+parser.add_argument('--plot_name', default="metric_3_tree_same", type=str, help='name of the final plot')
 
 parser.add_argument('--mask_threshold', default=0.9, type=float, help='')
 
