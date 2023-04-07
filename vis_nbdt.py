@@ -97,14 +97,14 @@ if __name__ == '__main__':
                 generate_html(G, root, args.arch, args.dataset, args.cam, img, net, wnids, num_cls,
                               args.output_dir, args.html_output, (448,448), 's', args.merge, ori_cls)
                 # generate_html(G, root, arch, dataset, cam_method, img, net, wnids, num_cls,
-                #               output_dir, html_output, (448,448),'w', 'w')
+                #        a       output_dir, html_output, (448,448),'w', 'w')
                 # generate_html(G, root, arch, dataset, cam_method, img, net, wnids, num_cls,
                 #               output_dir, html_output, (448,448),'c', 'complex')
             else:
                 generate_pro_html(G, root, args.method, path, args.arch, args.dataset, args.cam, img, net, wnids, num_cls,
                                   args.output_dir, args.html_output, (448,448),'s1', args.merge, ori_cls)
     else:
-        ori_cls = os.path.split(args.img_dir)[-2]
+        ori_cls = args.img_dir.split('/')[-2]
         if args.method != 'pro' and args.method != 'random':
             generate_html(G, root, args.arch, args.dataset, args.cam, args.img_dir, net, wnids, num_cls,
                           args.output_dir, args.html_output, (448,448), 's', args.merge, ori_cls)

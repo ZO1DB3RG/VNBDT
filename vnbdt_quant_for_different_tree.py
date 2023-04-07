@@ -19,11 +19,13 @@ parser.add_argument('--dataset', default='Imagenet10', type=str, help='dataset n
 parser.add_argument('--arch', default='ResNet50', type=str, help='name of the architecture')
 parser.add_argument('--method', default='induced', type=str, help='tree type, others are pro or random')
 parser.add_argument('--induced_pth_path', default='/home/lzl001/NBDT/neural-backed-decision-trees/checkpoint/ckpt-Imagenet10-ResNet50-lr0.01-SoftTreeSupLoss_induced.pth', type=str, help='class activate mapping methods')
-parser.add_argument('--pro_pth_path', default='/home/lzl001/NBDT/neural-backed-decision-trees/checkpoint/ckpt-Imagenet10-ResNet50-lr0.01-SoftTreeSupLoss_induced.pth', type=str, help='class activate mapping methods')
-parser.add_argument('--random_pth_path', default='/home/lzl001/NBDT/neural-backed-decision-trees/checkpoint/ckpt-Imagenet10-ResNet50-lr0.01-SoftTreeSupLoss_induced.pth', type=str, help='class activate mapping methods')
-parser.add_argument('--merge', default='complex', type=str, help='the way to merge the cam')
+parser.add_argument('--pro_pth_path', default='/home/lzl001/NBDT/neural-backed-decision-trees/checkpoint/ckpt-Imagenet10-ResNet50-lr0.01-SoftTreeSupLoss_pro.pth', type=str, help='class activate mapping methods')
+parser.add_argument('--random_pth_path', default='/home/lzl001/NBDT/neural-backed-decision-trees/checkpoint/ckpt-Imagenet10-ResNet50-lr0.01-SoftTreeSupLoss_random.pth', type=str, help='class activate mapping methods')
+parser.add_argument('--merge', default='simple', type=str, help='the way to merge the cam')
 
 parser.add_argument('--img_dir', default="/data/LZL/imagenet-10/test", type=str, help='image folder waiting infered and explained')
+parser.add_argument('--plot_name', default="metric_3_tree", type=str, help='name of the final plot')
+
 parser.add_argument('--mask_threshold', default=0.9, type=float, help='')
 
 parser.add_argument('--device', default='3', type=str, help='device')
@@ -72,10 +74,10 @@ if __name__ == "__main__":
             model = SoftNBDT(
                 pretrained=False,
                 dataset=args.dataset,
-                arch=args.arch,
+                path_graph=path,
                 model=net,
                 classes=wnids
-            ).eval()
+            ).cuda()
             model_dict[method] = model
 
     # 为html页面及其存储图片创建目录
@@ -84,7 +86,7 @@ if __name__ == "__main__":
         cls_dir = os.path.join(args.img_dir, CLASS)
         if os.path.exists(cls_dir):
             if os.listdir(cls_dir) != 0:
-                path_list += [os.path.join(cls_dir, i) for i in os.listdir(cls_dir)][:50]
+                path_list += [os.path.join(cls_dir, i) for i in os.listdir(cls_dir)]
         if len(path_list) == 0:
             Colors.red("No PIC of cls {} for explain".format(CLASS))
     metric_tree = {}
@@ -120,4 +122,4 @@ if __name__ == "__main__":
             Colors.green('metric calculation of {} is finished'.format(method))
         else:
             Colors.red('no pic, check again!')
-    plot_metric_all_tree(metric_tree, args.img_dir)
+    plot_metric_all_tree(metric_tree, args.img_dir, args.plot_name)

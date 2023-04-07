@@ -999,7 +999,7 @@ def generate_html(G, root, arch, dataset, cam_method, path_img, net, wnids, num_
 
     path_img2 = os.path.join('..', os.path.join(path_img.split('/')[-2], path_img.split('/')[-1])) #该路径用于插入root图像
     type_name = os.path.split(path_img)[1].split('.')[0].split('_')[-1] \
-                    + '_' + cam_method + '-' + weight
+                    + '-' + cam_method + '-' + weight
 
     img_name = os.path.split(path_img)[1].split('.')[0]
 
@@ -1035,10 +1035,7 @@ def generate_html(G, root, arch, dataset, cam_method, path_img, net, wnids, num_
     ).cuda()
 
     decisions, leaf_to_prob, node_to_prob, predicted, cls = forword_tree(x.cuda(), model, wnids, dataset)
-    if ori_cls == cls:
-        type_name = 'T-' + type_name
-    else:
-        type_name = 'F-' + type_name
+    type_name = ori_cls + '-' + cls + '-' + type_name
     # decision_to_wnid = get_decision_wnid(decisions[0])
     # record_node_prob(node_to_prob, decision_to_wnid, './experiment/mask_leaf_record.txt', img_name)
 
@@ -1145,7 +1142,7 @@ def generate_html(G, root, arch, dataset, cam_method, path_img, net, wnids, num_
         insert_image(tree['children'], decisions_path_label, image_dict, decisions_prob,
                      vis_image_resize_factor)
 
-    fname = os.path.join(html_output, type_name + '_cam_tree')
+    fname = os.path.join(html_output, type_name + '-cam-tree')
 
     parent = Path(fwd()).parent
 
@@ -1170,7 +1167,7 @@ def generate_pro_html(G, root, method, path, arch, dataset, cam_method, path_img
                       output_dir, html_output, size, name, weight, ori_cls):
     path_img2 = os.path.join('..', os.path.join(path_img.split('/')[-2], path_img.split('/')[-1]))  # 该路径用于插入root图像
     type_name = os.path.split(path_img)[1].split('.')[0].split('_')[-1] \
-                 + '_' + cam_method + '-' + weight
+                 + '-' + cam_method + '-' + weight
     img_name = os.path.split(path_img)[1].split('.')[0]
 
     # 图像读取和预处理，读取的图像img1用来合成CAM，im用来获取x
@@ -1205,10 +1202,8 @@ def generate_pro_html(G, root, method, path, arch, dataset, cam_method, path_img
     ).cuda()
     decisions, leaf_to_prob, node_to_prob, predicted, cls = forword_tree(x.cuda(), model, wnids, dataset)
 
-    if ori_cls == cls:
-        type_name = 'T-' + type_name
-    else:
-        type_name = 'F-' + type_name
+    type_name = ori_cls + '-' + cls + '-' + type_name
+
     # decision_to_wnid = get_decision_wnid(decisions[0])
     # record_node_prob(node_to_prob, decision_to_wnid, './experiment/mask_leaf_record.txt', img_name)
 
@@ -1310,7 +1305,7 @@ def generate_pro_html(G, root, method, path, arch, dataset, cam_method, path_img
         insert_image(tree['children'], decisions_path_label, image_dict, decisions_prob,
                      vis_image_resize_factor)
 
-    fname = os.path.join(html_output, type_name + '_cam_tree')
+    fname = os.path.join(html_output, type_name + '-cam-tree')
 
     parent = Path(fwd()).parent
 

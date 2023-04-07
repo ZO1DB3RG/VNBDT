@@ -3,6 +3,7 @@ import time
 
 import argparse
 
+import matplotlib.pyplot as plt
 import tqdm
 
 from nbdt.utils import DATASET_TO_NUM_CLASSES
@@ -18,18 +19,18 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--cam', default='gradcam', type=str, help='class activate mapping methods')
 parser.add_argument('--dataset', default='Imagenet10', type=str, help='dataset name')
 parser.add_argument('--arch', default='ResNet50', type=str, help='name of the architecture')
-parser.add_argument('--method', default='induced', type=str, help='tree type, others are pro or random')
-parser.add_argument('--pth_path', default='/home/lzl001/NBDT/neural-backed-decision-trees/checkpoint/ckpt-Imagenet10-ResNet50-lr0.01-SoftTreeSupLoss_induced.pth', type=str, help='class activate mapping methods')
+parser.add_argument('--method', default='pro', type=str, help='tree type, others are pro or random')
+parser.add_argument('--pth_path', default='/home/lzl001/NBDT/neural-backed-decision-trees/checkpoint/ckpt-Imagenet10-ResNet50-lr0.01-SoftTreeSupLoss_pro.pth', type=str, help='class activate mapping methods')
 parser.add_argument('--merge', default='simple', type=str, help='the way to merge the cam')
 
-parser.add_argument('--img_dir', default="/data/LZL/imagenet-10/test/Ibizan_hound", type=str, help='image folder waiting infered and explained')
-parser.add_argument('--output_dir', default="/data/LZL/imagenet-10/test/Ibizan_hound_out", type=str, help='Store CAM')
-parser.add_argument('--html_output', default="/data/LZL/imagenet-10/test/Ibizan_hound_html", type=str, help='Store html, should be the same father with output_dir')
+parser.add_argument('--img_dir', default="/data/LZL/imagenet-10/test/goose/n0185567200001166.jpg", type=str, help='image folder waiting infered and explained')
+parser.add_argument('--output_dir', default="out", type=str, help='Store CAM')
+parser.add_argument('--html_output', default="html", type=str, help='Store html, should be the same father with output_dir')
 
 parser.add_argument('--mask_threshold', default=0.9, type=float, help='')
 
 parser.add_argument('--name', default='', type=str, help='something you want your file name to be')
-parser.add_argument('--device', default='0', type=str, help='device')
+parser.add_argument('--device', default='3', type=str, help='device')
 
 if __name__ == "__main__":
     # base_path = '/home/lzl001/CNN_train/resnet50_pretrained3.pkl'
@@ -58,20 +59,29 @@ if __name__ == "__main__":
     # 输入网络权重获取NBDT树结构，延续原本的代码操作
     if args.method == 'induced':
         G, path = get_tree(dataset=args.dataset, arch=args.arch, model=net, method=args.method)
+        root = validate_tree(G, path, wnids)
+        model = SoftNBDT(
+            pretrained=False,
+            dataset=args.dataset,
+            arch=args.arch,
+            model=net,
+            classes=wnids
+        ).eval()
     # 也可以生成固定结构的专家树或者随机树，但要保证nbdt/hierarcies/dataset 文件夹下已存在对应的结构json文件
     else:
         G, path = get_pro_tree(dataset=args.dataset, arch=args.arch, method=args.method)
+        root = validate_tree(G, path, wnids)
+        model = SoftNBDT(
+            pretrained=False,
+            dataset=args.dataset,
+            path_graph=path,
+            model=net,
+            classes=wnids
+        ).cuda()
 
     # 验证树及其节点对应，并返回根节点Node
     # 该过程打印的信息若不需要可以删除
-    root = validate_tree(G, path, wnids)
-    model = SoftNBDT(
-        pretrained=False,
-        dataset=args.dataset,
-        arch=args.arch,
-        model=net,
-        classes=wnids
-    ).eval()
+
     # 为html页面及其存储图片创建目录
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
@@ -87,30 +97,24 @@ if __name__ == "__main__":
             else:
                 print("No PIC for explain")
 
-        ori_cls = os.path.split(args.img_dir)[-1]
+        ori_cls = args.img_dir.split('/')[-1]
 
         mask_dict = {}
         pred = None
-
+        plt.figure(figsize=(8, 5))
         for img in tqdm.tqdm(path_list):
             img2 = cv2.imread(img, 1)
 
             path_img2 = os.path.join('..', os.path.join(img.split('/')[-2], img.split('/')[-1]))  # 该路径用于插入root图像
             type_name = os.path.split(img)[1].split('.')[0].split('_')[-1] \
-                        + '_' + args.cam + '-' + args.merge
+                        + '-' + args.cam + '-' + args.merge
             img_name = os.path.split(img)[1].split('.')[0]
 
             decisions, leaf_to_prob, node_to_prob, predicted, cls, decision_to_wnid, cam_dict = get_nbdt_inference(args.arch, args.dataset, img, net, model, wnids,
                                                                                                                     (448,448),
                                                                                                                     args.cam,num_cls,img_name)
 
-            if ori_cls == cls:
-                file_name = 'T-' + type_name
-                pred = 1
-            else:
-                file_name = 'F-' + type_name
-                pred = 0
-
+            file_name = ori_cls + '-' + cls + '-' + type_name
             if not os.path.exists(os.path.join(args.output_dir, file_name)):
                 os.makedirs(os.path.join(args.output_dir, file_name))
             output_dir = os.path.join(args.output_dir, file_name)
@@ -126,8 +130,6 @@ if __name__ == "__main__":
             change_prob = compute_prob_change(mask_dict)
             change_iou = compute_iou_change(mask_dict)
             plot_metric(change_prob, change_iou, output_dir)
-
-
             if args.method != 'pro' and args.method != 'random':
                 generate_html(G, root, args.arch, args.dataset, args.cam, img, net, wnids, num_cls,
                               args.output_dir, args.html_output, (448, 448), args.name, args.merge, ori_cls)
@@ -135,9 +137,9 @@ if __name__ == "__main__":
             else:
                 generate_pro_html(G, root, args.method, path, args.arch, args.dataset, args.cam, img, net, wnids, num_cls,
                                   args.output_dir, args.html_output, (448, 448), args.name, args.merge, ori_cls)
-
+        plt.close()
     else:
-        ori_cls = os.path.split(args.img_dir)[-2]
+        ori_cls = args.img_dir.split('/')[-2]
         mask_dict = {}
         pred = None
         img = args.img_dir
@@ -145,7 +147,7 @@ if __name__ == "__main__":
 
         path_img2 = os.path.join('..', os.path.join(img.split('/')[-2], img.split('/')[-1]))  # 该路径用于插入root图像
         type_name = os.path.split(img)[1].split('.')[0].split('_')[-1] \
-                    + '_' + args.cam + '-' + args.merge
+                    + '-' + args.cam + '-' + args.merge
         img_name = os.path.split(img)[1].split('.')[0]
 
         decisions, leaf_to_prob, node_to_prob, predicted, cls, decision_to_wnid, cam_dict = get_nbdt_inference(
@@ -153,13 +155,7 @@ if __name__ == "__main__":
             (448, 448),
             args.cam, num_cls, img_name)
 
-        if ori_cls == cls:
-            file_name = 'T-' + type_name
-            pred = 1
-        else:
-            file_name = 'F-' + type_name
-            pred = 0
-
+        file_name = ori_cls + '-' + cls + '-' + type_name
         if not os.path.exists(os.path.join(args.output_dir, file_name)):
             os.makedirs(os.path.join(args.output_dir, file_name))
         output_dir = os.path.join(args.output_dir, file_name)
@@ -174,7 +170,7 @@ if __name__ == "__main__":
 
         change_prob = compute_prob_change(mask_dict)
         change_iou = compute_iou_change(mask_dict)
-        plot_metric(change_prob, change_iou, output_dir)
+        plot_metric_single_img(change_prob, change_iou, output_dir)
 
         if args.method != 'pro' and args.method != 'random':
             generate_html(G, root, args.arch, args.dataset, args.cam, img, net, wnids, num_cls,

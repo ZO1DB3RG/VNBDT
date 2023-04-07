@@ -198,7 +198,7 @@ def plot_metric_all_class(metric_class, output):
     plt.savefig(os.path.join(output, 'class_metrics.svg'), format='svg', bbox_inches='tight')
     Colors.green("successfully generate the plot of the metric")
 
-def plot_metric_all_tree(metric_class, output):
+def plot_metric_all_tree(metric_class, output, name):
     plt.figure(figsize=(18, 6))
     x = np.array(np.linspace(0.1, 0.9, 9))
     colors = ['red', 'green', 'blue']
@@ -247,8 +247,8 @@ def plot_metric_all_tree(metric_class, output):
     leg = plt.gca().get_legend()
     ltext = leg.get_texts()
     plt.setp(ltext, fontsize=10, fontweight='bold')
-    plt.savefig(os.path.join(output, 'tree_metrics.png'), dpi=300, bbox_inches='tight')
-    plt.savefig(os.path.join(output, 'tree_metrics.svg'), format='svg', bbox_inches='tight')
+    plt.savefig(os.path.join(output, name + '.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(output, name + '.svg'), format='svg', bbox_inches='tight')
     Colors.green("successfully generate the plot of the metric")
 
 def plot_metric(change_prob, change_iou, output):
@@ -256,7 +256,6 @@ def plot_metric(change_prob, change_iou, output):
     all_iou = weighted_AVG(change_iou)
 
     x = np.array(np.linspace(0.1, 0.9, 9))
-    plt.figure(figsize=(8, 5))
     plt.grid(linestyle="--")  # 设置背景网格线为虚线
     ax = plt.gca()
     ax.spines['top'].set_visible(False)  # 去掉上边框
@@ -278,8 +277,38 @@ def plot_metric(change_prob, change_iou, output):
     ltext = leg.get_texts()
     plt.setp(ltext, fontsize=14, fontweight='bold')  # 设置图例字体的大小和粗细
 
-    plt.savefig(os.path.join(output, 'metrics.png'), dpi=300)  # 建议保存为svg格式,再用inkscape转为矢量图emf后插入word中
+    plt.savefig(os.path.join(output, 'metrics.png'), dpi=300)
+    plt.clf()
+    # 建议保存为svg格式,再用inkscape转为矢量图emf后插入word中
     # Colors.green("successfully generate the plot of the metric to {}".format(os.path.join(output, 'metrics.png')))
 
+def plot_metric_single_img(change_prob, change_iou, output):
+    plt.figure(figsize=(8, 5))
+    all_prob = weighted_AVG(change_prob)
+    all_iou = weighted_AVG(change_iou)
+
+    x = np.array(np.linspace(0.1, 0.9, 9))
+    plt.grid(linestyle="--")  # 设置背景网格线为虚线
+    ax = plt.gca()
+    ax.spines['top'].set_visible(False)  # 去掉上边框
+    ax.spines['right'].set_visible(False)  # 去掉右边框
+
+    plt.plot(x, change_prob, marker='o', markersize=10, color="red", label="afc = %.4f" % all_prob, linewidth=1.5)
+    plt.plot(x, change_iou, marker='^', markersize=10, color="blue", label="iou = %.4f" % all_iou, linewidth=1.5)
+    group_labels = ['10%', '20%', '30%', '40%', '50%', '60%', '70%', '80%', '90%']  # x轴刻度的标识
+    plt.xticks(x, group_labels, fontsize=12, fontweight='bold')  # 默认字体大小为10
+    plt.yticks(fontsize=12, fontweight='bold')
+    # plt.title("example", fontsize=12, fontweight='bold')  # 默认字体大小为12
+    plt.xlabel("Pixels removed", fontsize=13, fontweight='bold')
+    plt.ylabel("afoc / iou", fontsize=13, fontweight='bold')
+    plt.xlim(0, 1)  # 设置x轴的范围
+
+    # plt.legend()          #显示各曲线的图例
+    plt.legend(loc=6, numpoints=1)
+    leg = plt.gca().get_legend()
+    ltext = leg.get_texts()
+    plt.setp(ltext, fontsize=14, fontweight='bold')  # 设置图例字体的大小和粗细
+
+    plt.savefig(os.path.join(output, 'metrics.png'), dpi=300)
 ###############################################################################
 
